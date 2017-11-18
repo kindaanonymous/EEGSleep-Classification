@@ -19,7 +19,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 #looping through all subject's training and testing file, and saving the individual model 
 
-for sub_num in np.arange(3,4):
+for sub_num in np.arange(0,1):
     
     subject = str(sub_num)
     print("subject number", subject)
@@ -28,44 +28,32 @@ for sub_num in np.arange(3,4):
     # Convolutional Layer 1s
     filter_size_1s = 50
     num_filters_1s = 64
-    #stride_1s = tf.constant(6, dtype=tf.int16)
     stride_1s = 6
     # Convolutional Layer 2s , 3s , 4s
     filter_size_s = 8
     num_filters_s = 128
-    #stride_s = tf.constant(1, dtype=tf.int16)
     stride_s = 1
     # Convolutional Layer 1l
-    filter_size_1l = 250
+    filter_size_1l = 400
     num_filters_1l = 64
-    stride_1l = 12  #officially 100/2=50, but too small for later on.  Try 100/4 instead
-    #stride_1l = tf.constant(50, dtype=tf.int16)
+    stride_1l = 25  #officially 100/2=50, but too small for later on.  Try 100/4 instead
     # Convolutional Layer 2l , 3l, 4l
-    filter_size_l = 8
+    filter_size_l = 6
     num_filters_l = 128
     stride_l = 1
-    #stride_l = tf.constant(1, dtype=tf.int16)
     # Max pool layer 1s
     pool_size_1s = 8
     pool_stride_1s = 8
-    #pool_size_1s= tf.constant(8, dtype=tf.int16)
-    #pool_stride_1s= tf.constant(8, dtype=tf.int16)
     # Max pool layer 2s
     pool_size_2s = 4
     pool_stride_2s = 4
-    #pool_size_2s= tf.constant(4, dtype=tf.int16)
-    #pool_stride_2s= tf.constant(4, dtype=tf.int16)
     # Max pool layer 1l
-    pool_size_1l = 6
-    pool_stride_1l = 6
-    #pool_size_1l= tf.constant(4, dtype=tf.int16)
-    #pool_stride_1l= tf.constant(4, dtype=tf.int16)
+    pool_size_1l = 4
+    pool_stride_1l = 4
 
     # Max pool layer 2l
-    pool_size_2l = 4
-    pool_stride_2l = 4
-    #pool_size_2l= tf.constant(2, dtype=tf.int16)
-    #pool_stride_2l= tf.constant(2, dtype=tf.int16)
+    pool_size_2l = 2
+    pool_stride_2l = 2
     
     #drop out
     #dropout_prob = 0.5
@@ -73,16 +61,13 @@ for sub_num in np.arange(3,4):
 
     # Fully-connected layer.
     fc_size = 1024         # Number of neurons in fully-connected layer.
-    #fc_size= tf.constant(1024, dtype=tf.int32)
     
     # 1d conv will use 1 channel
     num_channels = 1
-    #num_channels= tf.constant(1, dtype=tf.int16)
     # classes are Wake, stage1, stage2, stage3, REM
     num_classes = 5   
     # 30s epoch at 100hz 
     stage_length = 3000
-    #stage_length= tf.constant(3000, dtype=tf.int16)
 
 
     #initialise placeholders
@@ -164,7 +149,7 @@ for sub_num in np.arange(3,4):
     #np_y contains the targets of the eeg 5 sleep stages from 0 to 4
     #using SMOTE resample np_x and np_y to an even dataset
     print('Original dataset shape {}'.format(Counter(np_y)))
-    sm = RandomOverSampler(random_state=42)
+    sm = SMOTE(random_state=42)
     np_x_res, np_y_res = sm.fit_sample(np_x, np_y)
     print('Resampled dataset shape {}'.format(Counter(np_y_res)))
  
@@ -282,11 +267,6 @@ for sub_num in np.arange(3,4):
 
     #each convolutional layer performs a 1d conv, batch norm and relu activation
     def new_conv_layer(input, weights, bias, stride, phase_test, iteration, beta, gamma):
-    
-        #shape = [filter_size, num_input_channels, num_filters]
-        #weights = new_weights(shape)
-        #biases = new_biases(num_filters)
-
         conv = tf.nn.conv1d(value=input, filters=weights, stride=stride, padding='VALID') + bias
         activation = tf.nn.relu(conv)
         bn = batch_norm(activation, phase_test, beta, gamma)    
@@ -482,7 +462,7 @@ for sub_num in np.arange(3,4):
 
 
     #create model
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.99)
     session = tf.Session(config = tf.ConfigProto(gpu_options=gpu_options))
     session.run(tf.global_variables_initializer()) 
     #model_saver = tf.train.Saver({"W_1s":W_1s, "B_1s":B_1s, "BN_beta_1s": BN_beta_1s,"BN_gamma_1s": BN_gamma_1s,
@@ -505,14 +485,14 @@ for sub_num in np.arange(3,4):
     
     #add tensorboard details
     merged_summary = tf.summary.merge_all()
-    writer = tf.summary.FileWriter("../logdir")
+    writer = tf.summary.FileWriter("../logdir/Stage1"+subject)
     writer.add_graph(session.graph)
     #to start tensorboard, at cmd prompt type line below
     #tensorboard --logdir "C:\Users\HP-PC\Documents\fran\Masters\Comp5703 Capstone Project\logdir"
 
 
     train_batch_size = 100
-    num_iterations = 20000
+    num_iterations = 30000
     
     def rep_learn_optimise(num_interations):
         # Ensure we update the global variable rather than a local copy.
@@ -556,7 +536,7 @@ for sub_num in np.arange(3,4):
             # Print status every 100 iterations.
             if i % 1000 == 0:
                 #model_saver.save(session, "../saved_models/capstone_cnn_trainvar", global_step=100)
-                model_saver_full.save(session, "../saved_models/capstone_cnn_fullmodel_relu_bn"+subject+"/", global_step=100)
+                model_saver_full.save(session, "../saved_models/capstone_cnn_fullmodel"+subject+"/", global_step=100)
            
                 # Calculate the accuracy on the training-set.
                 acc_s = session.run(accuracy_s, feed_dict=feed_dict_train)
@@ -612,7 +592,7 @@ for sub_num in np.arange(3,4):
         print ("Confusion_Matrix CNN small")
         print (confusion_matrix(y_truth, y_predicted))    
     
-        with open('./output/cnn_result_oversamp'+subject+'.txt', 'w+') as f:
+        with open('./output/cnn_result_relu_bn'+subject+'.txt', 'w+') as f:
             print >> f, classification_report(y_truth, y_predicted, target_names=target_names)
             print >> f, confusion_matrix(y_truth, y_predicted)
                 
@@ -651,7 +631,7 @@ for sub_num in np.arange(3,4):
         print ("Confusion_Matrix CNN large")
         print (confusion_matrix(y_truth, y_predicted)) 
     
-        with open('./output/cnn_result_oversamp'+subject+'.txt', 'a+') as f:
+        with open('./output/cnn_result_relu_bn'+subject+'.txt', 'a+') as f:
             print >> f, classification_report(y_truth, y_predicted, target_names=target_names)
             print >> f, confusion_matrix(y_truth, y_predicted)
     
